@@ -8,45 +8,45 @@
   <style>
     body {
       font-family: sans-serif;
-      background: #f0f2f5;
+      background: #f5f6fa;
       padding: 20px;
       text-align: center;
     }
     h1 {
-      color: #333;
+      color: #2c3e50;
       margin-bottom: 30px;
     }
     .bet {
-      background: #fff;
+      background: #ffffff;
       margin: 15px auto;
       padding: 20px;
       border-radius: 12px;
-      width: 320px;
+      width: 300px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .odds-btn {
       background: #007bff;
       color: white;
       border: none;
-      padding: 10px 18px;
+      padding: 10px 20px;
       font-size: 16px;
       border-radius: 6px;
       cursor: pointer;
     }
     .min-bet {
-      font-size: 13px;
-      color: #777;
-      margin-top: 6px;
+      font-size: 14px;
+      color: #555;
+      margin-top: 8px;
     }
   </style>
 </head>
 <body>
 
-  <h1>PARLAY ASLAB FDM - Live Odds Dinamis</h1>
+  <h1>PARLAY ASLAB FDM - Live Odds</h1>
   <div id="bets-container"></div>
 
   <script>
-    // === KONFIGURASI FIREBASE ===
+    // === KONFIGURASI FIREBASE (isi punyamu sendiri jika diganti) ===
     const firebaseConfig = {
       apiKey: "AIzaSyDxKAH31G1o9okS1vj846Ipw68O2ihE9aA",
       authDomain: "parlay-aslab-fdm-22.firebaseapp.com",
@@ -54,8 +54,7 @@
       projectId: "parlay-aslab-fdm-22",
       storageBucket: "parlay-aslab-fdm-22.appspot.com",
       messagingSenderId: "882857776288",
-      appId: "1:882857776288:web:37945d260595b6228b65c5",
-      measurementId: "G-Y8X4GVZN47"
+      appId: "1:882857776288:web:37945d260595b6228b65c5"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -66,7 +65,10 @@
       "JOSHUA", "WAHYU", "WISNU BATU", "ANWAR", "ROBBY"
     ];
 
-    const betsContainer = document.getElementById("bets-container");
+    const BASE_ODDS = 1.20;
+    const MAX_ADJUST = 2.00;
+
+    const container = document.getElementById("bets-container");
 
     names.forEach(name => {
       const div = document.createElement("div");
@@ -76,33 +78,28 @@
         <button class="odds-btn" id="btn-${name}">Loading...</button>
         <div class="min-bet">Min Taruhan: 5K</div>
       `;
-      betsContainer.appendChild(div);
+      container.appendChild(div);
 
+      // Render Odds
       const oddsRef = db.ref("odds/" + name);
-      oddsRef.on("value", snapshot => {
-        const val = snapshot.val();
-        const btn = document.getElementById("btn-" + name);
-        btn.textContent = val ? "ODDS: " + val.toFixed(2) : "ODDS: 2.00";
+      oddsRef.on("value", snap => {
+        const val = snap.val();
+        document.getElementById("btn-" + name).textContent = "ODDS: " + (val || 2.00).toFixed(2);
       });
 
+      // Click handler
       div.querySelector("button").addEventListener("click", () => {
         const voteRef = db.ref("votes/" + name);
-
-        // Tambah vote
-        voteRef.transaction(currentVotes => {
-          return (currentVotes || 0) + 1;
-        }).then(() => {
+        voteRef.transaction(v => (v || 0) + 1).then(() => {
           db.ref("votes").once("value").then(snapshot => {
-            const votesData = snapshot.val() || {};
-            const totalVotes = Object.values(votesData).reduce((a, b) => a + b, 0);
+            const votes = snapshot.val() || {};
+            const totalVotes = Object.values(votes).reduce((a, b) => a + b, 0) || 1;
 
-            for (let key of names) {
-              const playerVotes = votesData[key] || 1;
-              const votePercent = playerVotes / totalVotes;
-              const newOdds = Math.max(1.10, (1 / votePercent) * 0.8); // Faktor 0.8
-
-              db.ref("odds/" + key).set(parseFloat(newOdds.toFixed(2)));
-            }
+            names.forEach(n => {
+              const playerVotes = votes[n] || 0;
+              const odds = BASE_ODDS + ((totalVotes - playerVotes) / totalVotes) * MAX_ADJUST;
+              db.ref("odds/" + n).set(parseFloat(odds.toFixed(2)));
+            });
 
             alert("NO DANA: STOP JUDI IDIOT");
           });
