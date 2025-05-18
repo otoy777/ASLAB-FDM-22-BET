@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Parlay ASLAB FDM - Live Odds</title>
+  <title>Parlay ASLAB FDM - Live Odds Dinamis</title>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
@@ -42,11 +42,11 @@
 </head>
 <body>
 
-  <h1>PARLAY ASLAB FDM - Live Odds</h1>
+  <h1>PARLAY ASLAB FDM - Live Odds Dinamis</h1>
   <div id="bets-container"></div>
 
   <script>
-    // ===== MASUKKAN CONFIG FIREBASE KAMU DI SINI =====
+    // === KONFIGURASI FIREBASE ===
     const firebaseConfig = {
       apiKey: "AIzaSyDxKAH31G1o9okS1vj846Ipw68O2ihE9aA",
       authDomain: "parlay-aslab-fdm-22.firebaseapp.com",
@@ -58,11 +58,9 @@
       measurementId: "G-Y8X4GVZN47"
     };
 
-    // Inisialisasi Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Daftar nama taruhan
     const names = [
       "TONGTONG", "NIZAR", "AMIRUL", "BEJO", "JARIP",
       "JOSHUA", "WAHYU", "WISNU BATU", "ANWAR", "ROBBY"
@@ -81,29 +79,33 @@
       betsContainer.appendChild(div);
 
       const oddsRef = db.ref("odds/" + name);
-
-      // Tampilkan odds realtime
       oddsRef.on("value", snapshot => {
         const val = snapshot.val();
         const btn = document.getElementById("btn-" + name);
-        if (val !== null && val !== undefined) {
-          btn.textContent = "ODDS: " + Number(val).toFixed(2);
-        } else {
-          btn.textContent = "ODDS: 2.00";
-        }
+        btn.textContent = val ? "ODDS: " + val.toFixed(2) : "ODDS: 2.00";
       });
 
-      // Saat tombol diklik
       div.querySelector("button").addEventListener("click", () => {
-        oddsRef.once("value").then(snapshot => {
-          let currentOdds = snapshot.val();
-          if (currentOdds === null || currentOdds === undefined) {
-            currentOdds = 2.00;
-          }
+        const voteRef = db.ref("votes/" + name);
 
-          const newOdds = Math.max(1.10, currentOdds - 0.05);
-          oddsRef.set(newOdds);
-          alert("NO DANA: 081517017228");
+        // Tambah vote
+        voteRef.transaction(currentVotes => {
+          return (currentVotes || 0) + 1;
+        }).then(() => {
+          db.ref("votes").once("value").then(snapshot => {
+            const votesData = snapshot.val() || {};
+            const totalVotes = Object.values(votesData).reduce((a, b) => a + b, 0);
+
+            for (let key of names) {
+              const playerVotes = votesData[key] || 1;
+              const votePercent = playerVotes / totalVotes;
+              const newOdds = Math.max(1.10, (1 / votePercent) * 0.8); // Faktor 0.8
+
+              db.ref("odds/" + key).set(parseFloat(newOdds.toFixed(2)));
+            }
+
+            alert("NO DANA: STOP JUDI IDIOT");
+          });
         });
       });
     });
